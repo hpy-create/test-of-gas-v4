@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>中二科學科 - 氣體檢驗模擬器</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #f0f4f8;
+            touch-action: manipulation;
+            font-size: 1.15rem;
+            line-height: 1.6;
+        }
+
+        /* 針對 11 吋 iPad 與平板最佳化 */
+        @media (min-width: 768px) and (max-width: 1200px) {
+            .ipad-container {
+                max-width: 100%;
+                padding: 0.5rem;
+            }
+        }
+        
+        /* 試管與試管架樣式 */
+        .test-tube-rack {
+            position: relative;
+            height: 220px;
+            display: flex;
+            justify-content: space-evenly;
+            align-items: flex-end;
+            padding-bottom: 25px;
+            margin-top: 15px;
+        }
+
+        /* 木製試管架視覺結構 */
+        .rack-structure-top {
+            position: absolute;
+            top: 75px;
+            left: 5%;
+            width: 90%;
+            height: 16px;
+            background: #a66e38;
+            border-radius: 4px;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.3), 0 2px 4px rgba(0,0,0,0.2);
+            z-index: 5;
+        }
+
+        .rack-structure-bottom {
+            position: absolute;
+            bottom: 10px;
+            left: 2%;
+            width: 96%;
+            height: 22px;
+            background: #8c5828;
+            border-radius: 6px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            z-index: 5;
+        }
+
+        .rack-pillar-left, .rack-pillar-right {
+            position: absolute;
+            bottom: 25px;
+            width: 18px;
+            height: 130px;
+            background: #73451e;
+            z-index: 4;
+            border-radius: 3px;
+        }
+        .rack-pillar-left { left: 6%; }
+        .rack-pillar-right { right: 6%; }
+
+        /* 試管主體 */
+        .test-tube {
+            width: 52px;
+            height: 175px;
+            border: 3px solid rgba(255, 255, 255, 0.9);
+            border-top: none;
+            border-radius: 0 0 26px 26px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.4) 0%, rgba(240,249,255,0.2) 100%);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.12), inset 0 0 10px rgba(255,255,255,0.8);
+            position: relative;
+            z-index: 10;
+            backdrop-filter: blur(2px);
+        }
+
+        /* 試管塞 */
+        .test-tube-stopper {
+            position: absolute;
+            top: -16px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 48px;
+            height: 18px;
+            background: #854d0e;
+            border-radius: 4px 4px 2px 2px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            transition: all 0.4s ease;
+            z-index: 12;
+        }
+
+        /* 試管內液體動畫 */
+        .test-tube-liquid {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 0%;
+            border-radius: 0 0 22px 22px;
+            transition: all 1s ease;
+            opacity: 0.85;
+        }
+
+        /* 木條與火焰（火頭朝下：bottom） */
+        .splint {
+            width: 10px;
+            height: 130px;
+            background: #d97706;
+            border-radius: 3px;
+            position: absolute;
+            transition: all 0.7s cubic-bezier(0.25, 1, 0.5, 1);
+            z-index: 30;
+        }
+
+        .flame {
+            width: 20px;
+            height: 32px;
+            background: radial-gradient(circle, #fef08a 20%, #f97316 60%, #dc2626 100%);
+            border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+            position: absolute;
+            bottom: -22px;
+            left: 50%;
+            transform: translateX(-50%);
+            animation: flicker 0.15s infinite alternate;
+            box-shadow: 0 0 12px #f97316;
+            transition: all 0.3s ease;
+        }
+
+        /* 快速熄滅動畫 */
+        .flame-extinguish-fast {
+            animation: extinguishFast 0.35s ease-out forwards !important;
+        }
+
+        @keyframes extinguishFast {
+            0% { transform: translateX(-50%) scale(1); opacity: 1; }
+            50% { transform: translateX(-50%) scale(0.4); opacity: 0.6; }
+            100% { transform: translateX(-50%) scale(0); opacity: 0; }
+        }
+
+        .ember {
+            width: 12px;
+            height: 12px;
+            background: #ef4444;
+            border-radius: 50%;
+            position: absolute;
+            bottom: -4px;
+            left: 50%;
+            transform: translateX(-50%);
+            box-shadow: 0 0 8px #ef4444;
+            animation: pulseEmber 0.8s infinite alternate;
+        }
+
+        .smoke {
+            width: 14px;
+            height: 14px;
+            background: rgba(156, 163, 175, 0.7);
+            border-radius: 50%;
+            position: absolute;
+            bottom: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            animation: puffSmoke 1.2s infinite ease-out;
+        }
+
+        @keyframes flicker {
+            0% { transform: translateX(-50%) scale(1) rotate(-2deg); }
+            100% { transform: translateX(-50%) scale(1.1) rotate(2deg); }
+        }
+
+        @keyframes pulseEmber {
+            0% { opacity: 0.6; transform: translateX(-50%) scale(0.9); }
+            100% { opacity: 1; transform: translateX(-50%) scale(1.2); }
+        }
+
+        @keyframes puffSmoke {
+            0% { opacity: 0.8; transform: translateX(-50%) translateY(0) scale(0.8); }
+            100% { opacity: 0; transform: translateX(-50%) translateY(-35px) scale(2.5); }
+        }
+
+        /* 滴管樣式 */
+        .dropper {
+            width: 12px;
+            height: 110px;
+            background: rgba(255,255,255,0.7);
+            border: 1px solid #94a3b8;
+            border-radius: 3px;
+            position: absolute;
+            transition: all 0.6s ease;
+            z-index: 30;
+        }
+        .dropper-bulb {
+            width: 22px;
+            height: 28px;
+            background: #475569;
+            border-radius: 50% 50% 20% 20%;
+            position: absolute;
+            top: -24px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+    </style>
+</head>
+<body class="p-3 md:p-6 text-slate-800">
+
+    <div class="max-w-7xl mx-auto space-y-5 ipad-container">
+        
+        <!-- 頁頭標題與情境說明 -->
+        <header class="bg-white p-5 md:p-7 rounded-2xl shadow-md border-l-8 border-blue-600">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+                <div>
+                    <h1 class="text-3xl md:text-4xl font-bold text-slate-900">中二級科學科：氣體檢驗模擬實驗</h1>
+                    <p class="text-lg md:text-xl text-slate-600 mt-2">何老師提供了三支充滿無色氣體的試管（氣體 A、B、C）。請利用適當的實驗工具辨別哪一支試管裝有<b>氧氣</b>、<b>二氧化碳</b>或<b>氮氣</b>。</p>
+                </div>
+                <div id="safety-status" class="bg-amber-100 border border-amber-300 text-amber-800 px-5 py-3 rounded-xl text-lg md:text-xl font-bold flex items-center gap-2 shrink-0">
+                    <span>⚠️ 未配戴安全裝備</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- 安全措施區域 -->
+        <section id="safety-zone" class="bg-amber-50 border-2 border-dashed border-amber-300 p-5 md:p-6 rounded-2xl flex flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-4">
+                <span class="text-5xl">🥽</span>
+                <div>
+                    <h3 class="font-bold text-xl md:text-2xl text-amber-900">安全守則與公平測試說明</h3>
+                    <p class="text-lg md:text-xl text-amber-800 mt-1">1. 進行任何化學實驗前必須配戴安全眼鏡。<br>2. <b>公平測試</b>：試管內的氣體反應後會被消耗，<b>每支試管使用完一次後必須點擊「換新試管」</b>。</p>
+                </div>
+            </div>
+            <button id="wear-goggles-btn" onclick="wearGoggles()" class="bg-amber-600 hover:bg-amber-700 text-white font-bold py-3.5 px-8 rounded-xl shadow transition text-lg md:text-xl whitespace-nowrap active:scale-95">
+                配戴安全眼鏡
+            </button>
+        </section>
+
+        <!-- 主要實驗區與操作台 -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+            
+            <!-- 左側：實驗操作台 (7 cols) -->
+            <div class="lg:col-span-7 bg-white p-5 md:p-6 rounded-2xl shadow-md flex flex-col justify-between relative overflow-hidden min-h-[500px]">
+                <div>
+                    <h2 class="text-2xl md:text-3xl font-bold text-slate-800 border-b pb-3 mb-3 flex flex-wrap justify-between items-center gap-2">
+                        <span>實驗操作台</span>
+                        <span id="fair-test-badge" class="text-base md:text-lg bg-slate-100 text-slate-700 px-3.5 py-1.5 rounded-lg font-semibold">公平測試：試管運作正常</span>
+                    </h2>
+                    
+                    <!-- 提示訊息欄 (獨立區塊，加大字體與間距) -->
+                    <div id="action-msg" class="my-4 p-4 bg-blue-50 text-blue-950 text-lg md:text-xl rounded-xl font-bold border border-blue-200 shadow-sm leading-relaxed block clear-both">
+                        請先點擊頂部的「配戴安全眼鏡」按鈕以開始實驗。
+                    </div>
+                </div>
+
+                <!-- 試管展示架區 -->
+                <div class="my-4 relative">
+                    <div class="test-tube-rack" id="test-tube-rack-area">
+                        
+                        <!-- 試管架木質結構 -->
+                        <div class="rack-structure-top"></div>
+                        <div class="rack-structure-bottom"></div>
+                        <div class="rack-pillar-left"></div>
+                        <div class="rack-pillar-right"></div>
+                        
+                        <!-- 試管 A -->
+                        <div class="flex flex-col items-center gap-2 relative z-10 mb-1">
+                            <div id="status-a" class="text-sm md:text-base font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-md border border-emerald-200 shadow-sm mb-4">全新試管</div>
+                            <div class="test-tube cursor-pointer active:scale-98 transition-transform" onclick="selectTube('A')" id="tube-container-A">
+                                <div class="test-tube-stopper" id="stopper-A"></div>
+                                <div class="test-tube-liquid" id="liquid-A"></div>
+                            </div>
+                            <span class="font-bold text-lg text-slate-800 bg-white/90 px-2.5 py-0.5 rounded shadow-sm">試管 A</span>
+                            <button onclick="resetTube('A')" class="text-base md:text-lg text-blue-600 hover:text-blue-800 font-bold underline p-1">換新試管</button>
+                        </div>
+
+                        <!-- 試管 B -->
+                        <div class="flex flex-col items-center gap-2 relative z-10 mb-1">
+                            <div id="status-b" class="text-sm md:text-base font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-md border border-emerald-200 shadow-sm mb-4">全新試管</div>
+                            <div class="test-tube cursor-pointer active:scale-98 transition-transform" onclick="selectTube('B')" id="tube-container-B">
+                                <div class="test-tube-stopper" id="stopper-B"></div>
+                                <div class="test-tube-liquid" id="liquid-B"></div>
+                            </div>
+                            <span class="font-bold text-lg text-slate-800 bg-white/90 px-2.5 py-0.5 rounded shadow-sm">試管 B</span>
+                            <button onclick="resetTube('B')" class="text-base md:text-lg text-blue-600 hover:text-blue-800 font-bold underline p-1">換新試管</button>
+                        </div>
+
+                        <!-- 試管 C -->
+                        <div class="flex flex-col items-center gap-2 relative z-10 mb-1">
+                            <div id="status-c" class="text-sm md:text-base font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-md border border-emerald-200 shadow-sm mb-4">全新試管</div>
+                            <div class="test-tube cursor-pointer active:scale-98 transition-transform" onclick="selectTube('C')" id="tube-container-C">
+                                <div class="test-tube-stopper" id="stopper-C"></div>
+                                <div class="test-tube-liquid" id="liquid-C"></div>
+                            </div>
+                            <span class="font-bold text-lg text-slate-800 bg-white/90 px-2.5 py-0.5 rounded shadow-sm">試管 C</span>
+                            <button onclick="resetTube('C')" class="text-base md:text-lg text-blue-600 hover:text-blue-800 font-bold underline p-1">換新試管</button>
+                        </div>
+
+                        <!-- 動態工具元素 -->
+                        <div id="anim-splint" class="splint hidden z-20">
+                            <div id="anim-ember" class="ember"></div>
+                            <div id="anim-flame" class="flame"></div>
+                            <div id="anim-smoke" class="smoke"></div>
+                        </div>
+
+                        <div id="anim-dropper" class="dropper hidden z-20">
+                            <div class="dropper-bulb"></div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- 工具選擇區 -->
+                <div>
+                    <h3 class="text-lg md:text-xl font-bold text-slate-800 mb-2">選擇測試工具：</h3>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <button onclick="prepareTool('burning-splint')" class="tool-btn border-2 border-slate-300 hover:border-blue-500 active:bg-blue-100 p-3.5 rounded-xl text-base md:text-lg font-bold flex flex-col items-center gap-1.5 bg-white hover:bg-blue-50 transition shadow-sm">
+                            <span class="text-3xl">🔥</span>
+                            <span>燃燒中的木條</span>
+                        </button>
+                        <button onclick="prepareTool('ember-splint')" class="tool-btn border-2 border-slate-300 hover:border-blue-500 active:bg-blue-100 p-3.5 rounded-xl text-base md:text-lg font-bold flex flex-col items-center gap-1.5 bg-white hover:bg-blue-50 transition shadow-sm">
+                            <span class="text-3xl">🪵</span>
+                            <span>帶有餘燼的木條</span>
+                        </button>
+                        <button onclick="prepareTool('limewater')" class="tool-btn border-2 border-slate-300 hover:border-blue-500 active:bg-blue-100 p-3.5 rounded-xl text-base md:text-lg font-bold flex flex-col items-center gap-1.5 bg-white hover:bg-blue-50 transition shadow-sm">
+                            <span class="text-3xl">🧪</span>
+                            <span>澄清石灰水</span>
+                        </button>
+                        <button onclick="prepareTool('bicarbonate')" class="tool-btn border-2 border-slate-300 hover:border-blue-500 active:bg-blue-100 p-3.5 rounded-xl text-base md:text-lg font-bold flex flex-col items-center gap-1.5 bg-white hover:bg-blue-50 transition shadow-sm">
+                            <span class="text-3xl">💧</span>
+                            <span>碳酸氫鹽指示劑</span>
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- 右側：實驗紀錄表 (5 cols) -->
+            <div class="lg:col-span-5 bg-white p-5 md:p-6 rounded-2xl shadow-md flex flex-col justify-between">
+                <div>
+                    <h2 class="text-2xl md:text-3xl font-bold text-slate-800 border-b pb-2">實驗紀錄表</h2>
+                    
+                    <!-- 觀察紀錄表格 -->
+                    <div class="mt-4 overflow-x-auto">
+                        <table class="w-full text-base md:text-lg text-left text-slate-800 border-2 border-slate-400 border-collapse">
+                            <thead class="bg-slate-100 text-slate-900 uppercase text-base md:text-lg">
+                                <tr>
+                                    <th class="p-3 border border-slate-300 font-bold text-center w-5/12">測試方法</th>
+                                    <th class="p-3 border border-slate-300 font-bold text-center w-7/36">氣體 A</th>
+                                    <th class="p-3 border border-slate-300 font-bold text-center w-7/36">氣體 B</th>
+                                    <th class="p-3 border border-slate-300 font-bold text-center w-7/36">氣體 C</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- 測試 1 至 4 列表 -->
+                                <tr class="border-b border-slate-300">
+                                    <td class="p-2 border border-slate-300 font-bold">
+                                        <div class="flex items-center gap-1">
+                                            <span>1.</span>
+                                            <select id="test-method-1" class="w-full p-2 border border-slate-300 rounded-lg bg-white font-medium text-base md:text-lg">
+                                                <option value="">-- 選擇測試 --</option>
+                                                <option value="帶有餘燼的木條">帶有餘燼的木條</option>
+                                                <option value="燃燒中的木條">燃燒中的木條</option>
+                                                <option value="澄清石灰水">澄清石灰水</option>
+                                                <option value="碳酸氫鹽指示劑">碳酸氫鹽指示劑</option>
+                                            </select>
+                                        </div>
+                                    </td>
+                                    <td class="p-1 border border-slate-300">
+                                        <select id="res-1-a" class="w-full p-2 border border-slate-300 rounded-lg bg-white font-medium text-sm md:text-base">
+                                            <option value="">-- 現象 --</option>
+                                            <option value="木條重燃">木條重燃</option>
+                                            <option value="劇烈地燃燒">劇烈地燃燒</option>
+                                            <option value="木條熄滅">木條熄滅</option>
+                                            <option value="石灰水變混濁">石灰水變混濁</option>
+                                            <option value="指示劑由紅變黃">指示劑由紅變黃</option>
+                                            <option value="沒有明顯變化">沒有明顯變化</option>
+                                        </select>
+                                    </td>
+                                    <td class="p-1 border border-slate-300">
+                                        <select id="res-1-b" class="w-full p-2 border border-slate-300 rounded-lg bg-white font-medium text-sm md:text-base">
+                                            <option value="">-- 現象 --</option>
+                                            <option value="木條重燃">木條重燃</option>
+                                            <option value="劇烈地燃燒">劇烈地燃燒</option>
+                                            <option value="木條熄滅">木條熄滅</option>
+                                            <option value="石灰水變混濁">石灰水變混濁</option>
+                                            <option value="指示劑由紅變黃">指示劑由紅變黃</option>
+                                            <option value="沒有明顯變化">沒有明顯變化</option>
+                                        </select>
+                                    </td>
+                                    <td class="p-1 border border-slate-300">
+                                        <select id="res-1-c" class="w-full p-2 border border-slate-300 rounded-lg bg-white font-medium text-sm md:text-base">
+                                            <option value="">-- 現象 --</option>
+                                            <option value="木條重燃">木條重燃</option>
+                                            <option value="劇烈地燃燒">劇烈地燃燒</option>
+                                            <option value="木條熄滅">木條熄滅</option>
+                                            <option value="石灰水變混濁">石灰水變混濁</option>
+                                            <option value="指示劑由紅變黃">指示劑由紅變黃</option>
+                                            <option value="沒有明顯變化">沒有明顯變化</option>
+                                        </select>
+                                    </td>
+                                </tr>
+                                <tr class="border-b border-slate-300">
+                                    <td class="p-2 border border-slate-300 font-bold">
+                                        <div class="flex items-center gap-1">
+                                            <span>2.</span>
+                                            <select id="test-method-2" class="w-full p-2 border border-slate-300 rounded-lg bg-white font-medium text-base md:text-lg">
+                                                <option value="">-- 選擇測試 --</option>
+                                                <option value="帶有餘燼的木條">帶有餘燼的木條</option>
+                                                <option value="燃燒中的木條">燃燒中的木條</option>
+                                                <option value="澄清石灰水">澄清石灰水</option>
+                                                <option value="碳酸氫鹽指示劑">碳酸氫鹽指示劑</option>
+                                            </select>
+                                        </div>
+                                    </td>
+                                    <td class="p-1 border border-slate-300">
+                                        <select id="res-2-a" class="w-full p-2 border border-slate-300 rounded-lg bg-white font-medium text-sm md:text-base">
+                                            <option value="">-- 現象 --</option>
+                                            <option value="木條重燃">木條重燃</option>
+                                            <option value="劇烈地燃燒">劇烈地燃燒</option>
+                                            <option value="木條熄滅">木條熄滅</option>
+                                            <option value="石灰水變混濁">石灰水變混濁</option>
+                                            <option value="指示劑由紅變黃">指示劑由紅變黃</option>
+                                            <option value="沒有明顯變化">沒有明顯變化</option>
+                                        </select>
+                                    </td>
+                                    <td class="p-1 border border-slate-300">
+                                        <select id="res-2-b" class="w-full p-2 border border-slate-300 rounded-lg bg-white font-medium text-sm md:text-base">
+                                            <option value="">-- 現象 --</option>
+                                            <option value="木條重燃">木條重燃</option>
+                                            <option value="劇烈地燃燒">劇烈地燃燒</option>
+                                            <option value="木條熄滅">木條熄滅</option>
+                                            <option value="石灰水變混濁">石灰水變混濁</option>
+                                            <option value="指示劑由紅變黃">指示劑由紅變黃</option>
+                                            <option value="沒有明顯變化">沒有明顯變化</option>
+                                        </select>
+                                    </td>
+                                    <td class="p-1 border border-slate-300">
+                                        <select id="res-2-c" class="w-full p-2 border border-slate-300 rounded-lg bg-white font-medium text-sm md:text-base">
+                                            <option value="">-- 現象 --</option>
+                                            <option value="木條重燃">木條重燃</option>
+                                            <option value="劇烈地燃燒">劇烈地燃燒</option>
+                                            <option value="木條熄滅">木條熄滅</option>
+                                            <option value="石灰水變混濁">石灰水變混濁</option>
+                                            <option value="指示劑由紅變黃">指示劑由紅變黃</option>
+                                            <option value="沒有明顯變化">沒有明顯變化</option>
+                                        </select>
+                                    </td>
+                                </tr>
+                                <tr class="border-b border-slate-300">
+                                    <td class="p-2 border border-slate-300 font-bold">
+                                        <div class="flex items-center gap-1">
+                                            <span>3.</span>
+                                            <select id="test-method-3" class="w-full p-2 border border-slate-300 rounded-lg bg-white font-medium text-base md:text-lg">
+                                                <option value="">-- 選擇測試 --</option>
+                                                <option value="帶有餘燼的木條">帶有餘燼的木條</option>
+                                                <option value="燃燒中的木條">燃燒中的木條</option>
+                                                <option value="澄清石灰水">澄清石灰水</option>
+                                                <option value="碳酸氫鹽指示劑">碳酸氫鹽指示劑</option>
+                                            </select>
+                                        </div>
+                                    </td>
+                                    <td class="p-1 border border-slate-300">
+                                        <select id="res-3-a" class="w-full p-2 border border-slate-300 rounded-lg bg-white font-medium text-sm md:text-base">
+                                            <option value="">-- 現象 --</option>
+                                            <option value="木條重燃">木條重燃</option>
+                                            <option value="劇烈地燃燒">劇烈地燃燒</option>
+                                            <option value="木條熄滅">木條熄滅</option>
+                                            <option value="石灰水變混濁">石灰水變混濁</option>
+                                            <option value="指示劑由紅變黃">指示劑由紅變黃</option>
+                                            <option value="沒有明顯變化">沒有明顯變化</option>
+                                        </select>
+                                    </td>
+                                    <td class="p-1 border border-slate-300">
+                                        <select id="res-3-b" class="w-full p-2 border border-slate-300 rounded-lg bg-white font-medium text-sm md:text-base">
+                                            <option value="">-- 現象 --</option>
+                                            <option value="木條重燃">木條重燃</option>
+                                            <option value="劇烈地燃燒">劇烈地燃燒</option>
+                                            <option value="木條熄滅">木條熄滅</option>
+                                            <option value="石灰水變混濁">石灰水變混濁</option>
+                                            <option value="指示劑由紅變黃">指示劑由紅變黃</option>
+                                            <option value="沒有明顯變化">沒有明顯變化</option>
+                                        </select>
+                                    </td>
+                                    <td class="p-1 border border-slate-300">
+                                        <select id="res-3-c" class="w-full p-2 border border-slate-300 rounded-lg bg-white font-medium text-sm md:text-base">
+                                            <option value="">-- 現象 --</option>
+                                            <option value="木條重燃">木條重燃</option>
+                                            <option value="劇烈地燃燒">劇烈地燃燒</option>
+                                            <option value="木條熄滅">木條熄滅</option>
+                                            <option value="石灰水變混濁">石灰水變混濁</option>
+                                            <option value="指示劑由紅變黃">指示劑由紅變黃</option>
+                                            <option value="沒有明顯變化">沒有明顯變化</option>
+                                        </select>
+                                    </td>
+                                </tr>
+                                <tr class="border-b border-slate-300">
+                                    <td class="p-2 border border-slate-300 font-bold">
+                                        <div class="flex items-center gap-1">
+                                            <span>4.</span>
+                                            <select id="test-method-4" class="w-full p-2 border border-slate-300 rounded-lg bg-white font-medium text-base md:text-lg">
+                                                <option value="">-- 選擇測試 --</option>
+                                                <option value="帶有餘燼的木條">帶有餘燼的木條</option>
+                                                <option value="燃燒中的木條">燃燒中的木條</option>
+                                                <option value="澄清石灰水">澄清石灰水</option>
+                                                <option value="碳酸氫鹽指示劑">碳酸氫鹽指示劑</option>
+                                            </select>
+                                        </div>
+                                    </td>
+                                    <td class="p-1 border border-slate-300">
+                                        <select id="res-4-a" class="w-full p-2 border border-slate-300 rounded-lg bg-white font-medium text-sm md:text-base">
+                                            <option value="">-- 現象 --</option>
+                                            <option value="木條重燃">木條重燃</option>
+                                            <option value="劇烈地燃燒">劇烈地燃燒</option>
+                                            <option value="木條熄滅">木條熄滅</option>
+                                            <option value="石灰水變混濁">石灰水變混濁</option>
+                                            <option value="指示劑由紅變黃">指示劑由紅變黃</option>
+                                            <option value="沒有明顯變化">沒有明顯變化</option>
+                                        </select>
+                                    </td>
+                                    <td class="p-1 border border-slate-300">
+                                        <select id="res-4-b" class="w-full p-2 border border-slate-300 rounded-lg bg-white font-medium text-sm md:text-base">
+                                            <option value="">-- 現象 --</option>
+                                            <option value="木條重燃">木條重燃</option>
+                                            <option value="劇烈地燃燒">劇烈地燃燒</option>
+                                            <option value="木條熄滅">木條熄滅</option>
+                                            <option value="石灰水變混濁">石灰水變混濁</option>
+                                            <option value="指示劑由紅變黃">指示劑由紅變黃</option>
+                                            <option value="沒有明顯變化">沒有明顯變化</option>
+                                        </select>
+                                    </td>
+                                    <td class="p-1 border border-slate-300">
+                                        <select id="res-4-c" class="w-full p-2 border border-slate-300 rounded-lg bg-white font-medium text-sm md:text-base">
+                                            <option value="">-- 現象 --</option>
+                                            <option value="木條重燃">木條重燃</option>
+                                            <option value="劇烈地燃燒">劇烈地燃燒</option>
+                                            <option value="木條熄滅">木條熄滅</option>
+                                            <option value="石灰水變混濁">石灰水變混濁</option>
+                                            <option value="指示劑由紅變黃">指示劑由紅變黃</option>
+                                            <option value="沒有明顯變化">沒有明顯變化</option>
+                                        </select>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- 推斷氣體結論 -->
+                    <div class="mt-6 bg-blue-50 p-4.5 rounded-xl border border-blue-200">
+                        <h3 class="font-bold text-xl text-blue-900 mb-3">實驗推斷結論：</h3>
+                        <div class="space-y-3.5 text-lg md:text-xl">
+                            <div class="flex items-center justify-between">
+                                <span class="font-bold text-slate-800">試管 A 盛載著：</span>
+                                <select id="ans-a" class="p-2 border border-slate-300 rounded-lg bg-white font-bold text-blue-900 text-lg md:text-xl">
+                                    <option value="">-- 請選擇 --</option>
+                                    <option value="氧氣">氧氣</option>
+                                    <option value="二氧化碳">二氧化碳</option>
+                                    <option value="氮氣">氮氣</option>
+                                </select>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="font-bold text-slate-800">試管 B 盛載著：</span>
+                                <select id="ans-b" class="p-2 border border-slate-300 rounded-lg bg-white font-bold text-blue-900 text-lg md:text-xl">
+                                    <option value="">-- 請選擇 --</option>
+                                    <option value="氧氣">氧氣</option>
+                                    <option value="二氧化碳">二氧化碳</option>
+                                    <option value="氮氣">氮氣</option>
+                                </select>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="font-bold text-slate-800">試管 C 盛載著：</span>
+                                <select id="ans-c" class="p-2 border border-slate-300 rounded-lg bg-white font-bold text-blue-900 text-lg md:text-xl">
+                                    <option value="">-- 請選擇 --</option>
+                                    <option value="氧氣">氧氣</option>
+                                    <option value="二氧化碳">二氧化碳</option>
+                                    <option value="氮氣">氮氣</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- 按鈕區 -->
+                <div class="mt-6 flex gap-3">
+                    <button onclick="submitAnswer()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-5 rounded-xl shadow-md transition text-xl md:text-2xl">
+                        提交答案
+                    </button>
+                    <button onclick="resetAll()" class="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-3.5 px-5 rounded-xl transition text-xl md:text-2xl">
+                        重新開始
+                    </button>
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- 結果對話框 -->
+    <div id="result-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-2xl max-w-lg w-full p-6 md:p-8 shadow-2xl space-y-4">
+            <h3 id="modal-title" class="text-2xl md:text-3xl font-bold text-slate-900"></h3>
+            <p id="modal-msg" class="text-lg md:text-xl text-slate-700 leading-relaxed"></p>
+            <div id="modal-details" class="bg-slate-50 p-4 rounded-xl text-base md:text-lg space-y-2 border border-slate-200"></div>
+            <button onclick="closeModal()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl text-lg md:text-xl transition">
+                確定
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const gases = ['氧氣', '二氧化碳', '氮氣'];
+        let tubeGas = { A: '', B: '', C: '' };
+        let tubeUsed = { A: false, B: false, C: false };
+        let gogglesOn = false;
+        let selectedTool = null;
+
+        function initSimulator() {
+            const shuffled = [...gases].sort(() => Math.random() - 0.5);
+            tubeGas.A = shuffled[0];
+            tubeGas.B = shuffled[1];
+            tubeGas.C = shuffled[2];
+
+            tubeUsed = { A: false, B: false, C: false };
+            selectedTool = null;
+            updateTubeUI();
+            
+            document.getElementById('action-msg').className = "my-4 p-4 bg-blue-50 text-blue-950 text-lg md:text-xl rounded-xl font-bold border border-blue-200 shadow-sm leading-relaxed block clear-both";
+            document.getElementById('action-msg').innerText = gogglesOn 
+                ? "請點選下方的「測試工具」，然後點擊想測試的試管。" 
+                : "請先點擊頂部的「配戴安全眼鏡」按鈕以開始實驗。";
+        }
+
+        function wearGoggles() {
+            gogglesOn = true;
+            document.getElementById('safety-status').className = "bg-emerald-100 border border-emerald-300 text-emerald-800 px-5 py-3 rounded-xl text-lg md:text-xl font-bold flex items-center gap-2";
+            document.getElementById('safety-status').innerHTML = "<span>🥽 已配戴安全眼鏡</span>";
+            document.getElementById('safety-zone').classList.add('hidden');
+            document.getElementById('action-msg').innerText = "已配戴安全眼鏡！現在請選擇下方的「測試工具」。";
+        }
+
+        function prepareTool(tool) {
+            if (!gogglesOn) {
+                showAlert("安全提示", "為了實驗安全，請先配戴安全眼鏡！");
+                return;
+            }
+
+            selectedTool = tool;
+            let toolName = "";
+            if (tool === 'burning-splint') toolName = "燃燒中的木條";
+            if (tool === 'ember-splint') toolName = "帶有餘燼的木條";
+            if (tool === 'limewater') toolName = "澄清石灰水";
+            if (tool === 'bicarbonate') toolName = "碳酸氫鹽指示劑";
+
+            document.getElementById('action-msg').innerText = `已選擇工具：「${toolName}」。請點擊目標試管（A、B 或 C）進行測試。`;
+        }
+
+        function selectTube(tubeId) {
+            if (!gogglesOn) {
+                showAlert("安全提示", "請先配戴安全眼鏡！");
+                return;
+            }
+
+            if (!selectedTool) {
+                document.getElementById('action-msg').innerText = "請先在下方選擇一種「測試工具」！";
+                return;
+            }
+
+            if (tubeUsed[tubeId]) {
+                showAlert("公平測試警告", `試管 ${tubeId} 已經使用過！根據公平測試原則，請點擊「換新試管」按鈕換取全新試管後再測試。`);
+                return;
+            }
+
+            executeTest(tubeId, selectedTool);
+        }
+
+        function executeTest(tubeId, tool) {
+            const gas = tubeGas[tubeId];
+            tubeUsed[tubeId] = true;
+            updateTubeUI();
+
+            document.getElementById(`stopper-${tubeId}`).style.transform = "translateY(-30px)";
+            document.getElementById(`stopper-${tubeId}`).style.opacity = "0";
+
+            if (tool === 'burning-splint' || tool === 'ember-splint') {
+                runSplintTest(tubeId, gas, tool);
+            } else {
+                runLiquidTest(tubeId, gas, tool);
+            }
+        }
+
+        function runSplintTest(tubeId, gas, tool) {
+            const splint = document.getElementById('anim-splint');
+            const flame = document.getElementById('anim-flame');
+            const ember = document.getElementById('anim-ember');
+            const smoke = document.getElementById('anim-smoke');
+            const rackArea = document.getElementById('test-tube-rack-area');
+            const tubeObj = document.getElementById(`tube-container-${tubeId}`);
+
+            flame.style.display = 'none';
+            flame.classList.remove('flame-extinguish-fast');
+            flame.style.transform = '';
+            ember.style.display = 'none';
+            smoke.style.display = 'none';
+            splint.style.transform = 'translateY(0)';
+            splint.style.opacity = '1';
+            splint.classList.remove('hidden');
+
+            if (tool === 'ember-splint') {
+                ember.style.display = 'block';
+            } else {
+                flame.style.display = 'block';
+            }
+
+            const rackRect = rackArea.getBoundingClientRect();
+            const tubeRect = tubeObj.getBoundingClientRect();
+
+            const leftOffset = (tubeRect.left - rackRect.left) + (tubeRect.width / 2) - 5;
+            const topOffset = (tubeRect.top - rackRect.top) - 140;
+
+            splint.style.left = `${leftOffset}px`;
+            splint.style.top = `${topOffset}px`;
+            
+            setTimeout(() => {
+                splint.style.transform = "translateY(135px)";
+            }, 60);
+
+            setTimeout(() => {
+                let msg = "";
+                if (gas === '氧氣') {
+                    if (tool === 'ember-splint') {
+                        ember.style.display = 'none';
+                        flame.style.display = 'block';
+                        msg = `觀察結果（試管 ${tubeId}）：帶有餘燼的木條【火頭向下深入試管內部重燃】，發出明亮火焰！這證明試管內為氧氣。`;
+                    } else {
+                        flame.style.display = 'block';
+                        flame.style.transform = "scale(1.4)";
+                        msg = `觀察結果（試管 ${tubeId}）：燃燒中的木條【深入試管內部劇烈燃燒】！`;
+                    }
+                } else if (gas === '二氧化碳' || gas === '氮氣') {
+                    if (tool === 'burning-splint') {
+                        flame.classList.add('flame-extinguish-fast');
+                        setTimeout(() => {
+                            flame.style.display = 'none';
+                            ember.style.display = 'none';
+                            smoke.style.display = 'block';
+                        }, 300);
+                        msg = `觀察結果（試管 ${tubeId}）：燃燒中的木條進入試管後【火焰迅速熄滅】！`;
+                    } else {
+                        flame.style.display = 'none';
+                        ember.style.display = 'none';
+                        smoke.style.display = 'block';
+                        msg = `觀察結果（試管 ${tubeId}）：帶有餘燼的木條【進入試管內部後立即熄滅】！`;
+                    }
+                }
+
+                document.getElementById('action-msg').innerText = msg;
+
+                setTimeout(() => {
+                    splint.style.transform = "translateY(-20px)";
+                    splint.style.opacity = "0.2";
+                    setTimeout(() => {
+                        splint.classList.add('hidden');
+                        resetStopper(tubeId);
+                    }, 600);
+                }, 2200);
+
+            }, 950);
+        }
+
+        function runLiquidTest(tubeId, gas, tool) {
+            const liquid = document.getElementById(`liquid-${tubeId}`);
+            let msg = "";
+
+            if (tool === 'limewater') {
+                liquid.style.height = "40%";
+                liquid.style.backgroundColor = "rgba(226, 232, 240, 0.5)";
+
+                setTimeout(() => {
+                    if (gas === '二氧化碳') {
+                        liquid.style.backgroundColor = "rgba(255, 255, 255, 0.95)";
+                        msg = `觀察結果（試管 ${tubeId}）：澄清石灰水【變為乳白色混濁】！這是二氧化碳的特有反應。`;
+                    } else {
+                        msg = `觀察結果（試管 ${tubeId}）：澄清石灰水【保持澄清，沒有明顯變化】。`;
+                    }
+                    document.getElementById('action-msg').innerText = msg;
+                    setTimeout(() => resetStopper(tubeId), 1500);
+                }, 800);
+
+            } else if (tool === 'bicarbonate') {
+                liquid.style.height = "40%";
+                liquid.style.backgroundColor = "rgba(239, 68, 68, 0.8)";
+
+                setTimeout(() => {
+                    if (gas === '二氧化碳') {
+                        liquid.style.backgroundColor = "rgba(234, 179, 8, 0.9)";
+                        msg = `觀察結果（試管 ${tubeId}）：碳酸氫鹽指示劑由紅色【變為黃色】。`;
+                    } else {
+                        msg = `觀察結果（試管 ${tubeId}）：碳酸氫鹽指示劑【保持紅色，沒有明顯變化】。`;
+                    }
+                    document.getElementById('action-msg').innerText = msg;
+                    setTimeout(() => resetStopper(tubeId), 1500);
+                }, 800);
+            }
+        }
+
+        function resetStopper(tubeId) {
+            document.getElementById(`stopper-${tubeId}`).style.transform = "translateY(0)";
+            document.getElementById(`stopper-${tubeId}`).style.opacity = "1";
+        }
+
+        function resetTube(tubeId) {
+            tubeUsed[tubeId] = false;
+            const liquid = document.getElementById(`liquid-${tubeId}`);
+            liquid.style.height = "0%";
+            updateTubeUI();
+            document.getElementById('action-msg').innerText = `試管 ${tubeId} 已換成全新試管，可以重新進行公平測試。`;
+        }
+
+        function updateTubeUI() {
+            ['A', 'B', 'C'].forEach(id => {
+                const statusElem = document.getElementById(`status-${id.toLowerCase()}`);
+                if (statusElem) {
+                    if (tubeUsed[id]) {
+                        statusElem.innerText = "已使用（需更換）";
+                        statusElem.className = "text-sm md:text-base font-bold text-amber-700 bg-amber-50 px-3 py-1 rounded-md border border-amber-200 mb-4";
+                    } else {
+                        statusElem.innerText = "全新試管";
+                        statusElem.className = "text-sm md:text-base font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-md border border-emerald-200 mb-4";
+                    }
+                }
+            });
+        }
+
+        function submitAnswer() {
+            const ansA = document.getElementById('ans-a').value;
+            const ansB = document.getElementById('ans-b').value;
+            const ansC = document.getElementById('ans-c').value;
+
+            if (!ansA || !ansB || !ansC) {
+                showAlert("填寫不完整", "請在實驗紀錄表下方選取試管 A、B 及 C 的氣體推斷結論！");
+                return;
+            }
+
+            const isCorrect = (ansA === tubeGas.A && ansB === tubeGas.B && ansC === tubeGas.C);
+
+            const modalTitle = document.getElementById('modal-title');
+            const modalMsg = document.getElementById('modal-msg');
+            const modalDetails = document.getElementById('modal-details');
+
+            if (isCorrect) {
+                modalTitle.innerText = "🎉 恭喜你！解答完全正確！";
+                modalTitle.className = "text-2xl font-bold text-emerald-600";
+                modalMsg.innerText = "你非常出色地運用了科學方法與公平測試原則，成功辨別出所有氣體！";
+            } else {
+                modalTitle.innerText = "❌ 答案未完全正確";
+                modalTitle.className = "text-2xl font-bold text-rose-600";
+                modalMsg.innerText = "部分氣體推斷有誤，請參考以下正確分析再試一次：";
+            }
+
+            modalDetails.innerHTML = `
+                <p><b>正確實驗解析：</b></p>
+                <p>• <b>試管 A（${tubeGas.A}）</b>：${getGasReason(tubeGas.A)}</p>
+                <p>• <b>試管 B（${tubeGas.B}）</b>：${getGasReason(tubeGas.B)}</p>
+                <p>• <b>試管 C（${tubeGas.C}）</b>：${getGasReason(tubeGas.C)}</p>
+            `;
+
+            document.getElementById('result-modal').classList.remove('hidden');
+        }
+
+        function getGasReason(gas) {
+            if (gas === '氧氣') return '能令帶有餘燼的木條重燃（助燃性）。';
+            if (gas === '二氧化碳') return '令木條熄滅，且能令澄清石灰水變乳白色混濁。';
+            if (gas === '氮氣') return '令木條熄滅，但不會令澄清石灰水變混濁。';
+        }
+
+        function showAlert(title, msg) {
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-title').className = "text-2xl font-bold text-slate-800";
+            document.getElementById('modal-msg').innerText = msg;
+            document.getElementById('modal-details').innerHTML = "";
+            document.getElementById('result-modal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('result-modal').classList.add('hidden');
+        }
+
+        function resetAll() {
+            for (let i = 1; i <= 4; i++) {
+                const methodElem = document.getElementById(`test-method-${i}`);
+                if (methodElem) methodElem.value = "";
+                ['a', 'b', 'c'].forEach(tube => {
+                    const resElem = document.getElementById(`res-${i}-${tube}`);
+                    if (resElem) resElem.value = "";
+                });
+            }
+            ['ans-a', 'ans-b', 'ans-c'].forEach(id => {
+                const elem = document.getElementById(id);
+                if (elem) elem.value = "";
+            });
+            ['A', 'B', 'C'].forEach(id => resetTube(id));
+            initSimulator();
+        }
+
+        window.onload = initSimulator;
+    </script>
+</body>
+</html>
